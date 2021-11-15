@@ -12,7 +12,7 @@ Methods         GET
 router.get("/", async (req, res) => {
   try {
     const Publication = await PublicationModel.find();
-    if (Publication) {
+    if (Publication.length > 0) {
       res.json({
         publications: Publication,
       });
@@ -37,11 +37,27 @@ router.post("/new/", async (req, res) => {
   try {
     const { newPublication } = req.body;
 
-    const Publication = await PublicationModel.create(newPublication);
+    if (newPublication.id && newPublication.name && newPublication.books) {
+      const checkIfPublicationExists = await PublicationModel.findOne({
+        id: newPublication.id,
+      });
 
-    res.status(200).json({
-      msg: "Publication Added Successfully",
-    });
+      if (!checkIfPublicationExists) {
+        const Publication = await PublicationModel.create(newPublication);
+
+        res.status(200).json({
+          msg: "Publication Added Successfully",
+        });
+      } else {
+        res.status(400).json({
+          msg: `Publication with id ${newPublication.id} Already Exists`,
+        });
+      }
+    } else {
+      res.status(400).json({
+        msg: "Please Fill All The Fields",
+      });
+    }
   } catch (error) {
     res.status(400).json({
       error: error.message,

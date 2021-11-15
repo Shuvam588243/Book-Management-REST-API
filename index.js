@@ -24,6 +24,15 @@ mongoose
     console.log("Database Connected");
   });
 
+
+booker.get('/',(req,res)=>{
+  res.status(200).json({
+    message : 'Welcome to Book API'
+  })
+})
+
+
+
 booker.listen(port, () => {
   console.log(`Listening to port ${port}`);
 });
