@@ -9,10 +9,18 @@ Parameter       None
 Methods         GET
 */
 router.get("/", async (req, res) => {
-  const Author = await AuthorModel.find();
-  res.json({
-    author: Author,
-  });
+  try {
+    const Author = await AuthorModel.find();
+    if (Author) {
+      res.status(200).json({
+        author: Author,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
 });
 
 /* 
@@ -22,15 +30,22 @@ router.get("/", async (req, res) => {
   Parameter       isbn
   Methods         GET
   */
-router.post("/new", (req, res) => {
+router.post("/new", async (req, res) => {
   try {
     const { newAuthor } = req.body;
-    const Author = AuthorModel.create(newAuthor);
-    res.json({
-      msg: "Author Added Successfully",
-    });
-  } catch (err) {
-    res.json({ err: err.message });
+    const checkIfAuthorExists = await AuthorModel.findOne({ id: newAuthor.id });
+    if (!checkIfAuthorExists) {
+      const Author = AuthorModel.create(newAuthor);
+      res.status(200).json({
+        msg: "Author Added Successfully",
+      });
+    } else {
+      res.status(400).json({
+        msg: `Author with id ${newAuthor.id} Already Exists`,
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -42,22 +57,21 @@ router.post("/new", (req, res) => {
   Methods         GET
   */
 router.get("/:author_id", async (req, res) => {
-  const { author_id } = req.params;
-
   try {
+    const { author_id } = req.params;
     const getSpecificAuthor = await AuthorModel.find({ id: author_id });
 
-    if (specificAuthor) {
-      res.json({
+    if (getSpecificAuthor) {
+      res.status(200).json({
         author: getSpecificAuthor,
       });
     } else {
-      res.json({
+      res.status(400).json({
         error: `Author with id ${req.params.author_id} doesn't exist`,
       });
     }
-  } catch (err) {
-    res.json({ err: err.message });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 //-------------------------------------------------------------------------------
@@ -69,18 +83,22 @@ router.get("/:author_id", async (req, res) => {
   Methods         GET
   */
 router.get("/book/:isbn", async (req, res) => {
-  const getAuthorByBook = await AuthorModel.findOne({
-    books: req.params.isbn,
-  });
+  try {
+    const getAuthorByBook = await AuthorModel.findOne({
+      books: req.params.isbn,
+    });
 
-  if (AuthorByBook.length) {
-    res.json({
-      author: getAuthorByBook,
-    });
-  } else {
-    res.json({
-      error: `Author for book with ISBN ${req.params.isbn} doesn't exist`,
-    });
+    if (getAuthorByBook) {
+      res.status(200).json({
+        author: getAuthorByBook,
+      });
+    } else {
+      res.status(400).json({
+        error: `Author for book with ISBN ${req.params.isbn} doesn't exist`,
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 // Route    - /authors/update/:id
@@ -91,13 +109,22 @@ router.get("/book/:isbn", async (req, res) => {
 // Body     - { "author_name": "new author_name" }
 
 router.put("/update/:author_id", async (req, resp) => {
-  const updatedAuthorName = await AuthorModel.findOneAndUpdate(
-    { id: parseInt(req.params.author_id) },
-    { name: req.body.author_name },
-    { new: true }
-  );
-
-  return res.json(updatedAuthorName);
+  try {
+    const updatedAuthorName = await AuthorModel.findOneAndUpdate(
+      { id: parseInt(req.params.author_id) },
+      { name: req.body.author_name },
+      { new: true }
+    );
+    if (updatedAuthorName) {
+      return res.status(200).json(updatedAuthorName);
+    } else {
+      resp.status(400).json({
+        error: `Author with id ${req.params.author_id} doesn't exist`,
+      });
+    }
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 // Route    - /authors/delete/:author_id
 // Des      - delete an author
@@ -107,11 +134,22 @@ router.put("/update/:author_id", async (req, resp) => {
 // Body     - none
 
 router.delete("/delete/:author_id", async (req, res) => {
-  const deleteAuthor = await AuthorModel.findOneAndDelete({
-    id: parseInt(req.params.author_id),
-  });
-
-  return res.json({ msg: "Author deleted successfully" });
+  try {
+    const deleteAuthor = await AuthorModel.findOneAndDelete({
+      id: parseInt(req.params.author_id),
+    });
+    if (deleteAuthor) {
+      res.status(200).json({
+        msg: "Author Deleted Successfully",
+      });
+    } else {
+      res.status(400).json({
+        error: `Author with id ${req.params.author_id} doesn't exist`,
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 module.exports = router;

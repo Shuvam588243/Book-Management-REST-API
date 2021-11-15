@@ -3,7 +3,7 @@ const BookModel = require("../models/BookSchema");
 const AuthorModel = require("../models/AuthorSchema");
 
 /* 
-Route           /
+Route           /books/
 Description     To get all the books
 Access          PUBLIC
 Parameter       None
@@ -13,9 +13,9 @@ Methods         GET
 router.get("/", async (req, res) => {
   try {
     const Books = await BookModel.find();
-    res.json(Books);
+    res.status(200).json(Books);
   } catch (err) {
-    res.json({ err: err.message });
+    res.status(200).json({ err: err.message });
   }
 });
 
@@ -27,18 +27,37 @@ Parameter       none
 Methods         POST
 Body            newBook(ISBN,title,pub_date,language,page_num,author,category,publicat)
 */
-router.post("/new", (req, res) => {
+router.post("/new", async (req, res) => {
   try {
     const { newBook } = req.body;
-
-    const Book = BookModel.create(newBook);
-
-    res.json({
-      msg: "Books Added",
-      book: Book,
-    });
+    if (
+      newBook.ISBN &&
+      newBook.title &&
+      newBook.pub_date &&
+      newBook.language &&
+      newBook.page_num &&
+      newBook.author &&
+      newBook.category &&
+      newBook.publication
+    ) {
+      const checkISBN = await BookModel.findOne({ ISBN: newBook.ISBN });
+      if (checkISBN) {
+        res
+          .status(200)
+          .json({ message: `Book with ${newBook.ISBN} already exists` });
+      } else {
+        const Book = BookModel.create(newBook);
+        res.status(200).json({
+          msg: "Books Added Successfully",
+        });
+      }
+    } else {
+      res.status(200).json({
+        msg: "Please Provide All the Required Fields",
+      });
+    }
   } catch (err) {
-    res.json({ err: err.message });
+    res.status(400).json({ err: err.message });
   }
 });
 
@@ -55,16 +74,16 @@ router.get("/:isbn", async (req, res) => {
     const getBook = await BookModel.findOne({ ISBN: isbn });
 
     if (getBook) {
-      res.json({
+      res.status(200).json({
         book: getBook,
       });
     } else {
-      res.json({
+      res.status(400).json({
         error: `No Book is available for the ISBN ${isbn}`,
       });
     }
   } catch (err) {
-    res.json({ err: err.message });
+    res.status(400).json({ err: err.message });
   }
 });
 
@@ -82,16 +101,16 @@ router.get("/category/:category", async (req, res) => {
     });
 
     if (getSpecificBook.length != 0) {
-      res.json({
+      res.status(200).json({
         book: getSpecificBook,
       });
     } else {
-      res.json({
+      res.status(400).json({
         error: `No Book is available for the Category ${req.params.category}`,
       });
     }
   } catch (err) {
-    res.json({ err: err.message });
+    res.status(400).json({ err: err.message });
   }
 });
 
@@ -105,20 +124,20 @@ Methods         GET
 router.get("/language/:lang", async (req, res) => {
   try {
     const getSpecificBook = await BookModel.find({
-      language: req.params.language,
+      language: req.params.lang,
     });
 
-    if (getSpecificBook) {
-      res.json({
+    if (getSpecificBook.length != 0) {
+      res.status(200).json({
         book: getSpecificBook,
       });
     } else {
-      res.json({
-        error: `No Book is available on language ${req.params.language}`,
+      res.status(400).json({
+        error: `No Book is available on language ${req.params.lang}`,
       });
     }
   } catch (err) {
-    res.json({ err: err.message });
+    res.status(400).json({ err: err.message });
   }
 });
 
@@ -129,19 +148,21 @@ router.get("/language/:lang", async (req, res) => {
 // Params   - author
 // Body     - none
 
-router.get("/:author_id", async (req, res) => {
+router.get("/aut/:author_id", async (req, res) => {
   const getSpecificBook = await BookModel.findOne({
-    authors: parseInt(request.params.author_id),
+    author: parseInt(req.params.author_id),
   });
-
-  if (!getSpecificBook) {
-    return response.json({
+  if (getSpecificBook) {
+    res.status(200).json({
+      book: getSpecificBook,
+    });
+  } else {
+    return res.json({
       error: `No book found for the author of ${parseInt(
-        request.params.author_id
+        req.params.author_id
       )}`,
     });
   }
-  return response.json(getSpecificBook);
 });
 
 /* 
@@ -157,26 +178,34 @@ router.put("/update/:isbn/author/", async (req, res) => {
     const { isbn } = req.params;
     const { newAuthor } = req.body;
 
-    const updateBook = await BookModel.findOneAndUpdate(
-      {
-        ISBN: isbn,
-      },
-      {
-        $addToSet: {
-          author: newAuthor,
-        },
-      },
-      {
-        new: true,
-      }
-    );
+    const CheckForAuthor = await BookModel.findOne({ author: newAuthor });
 
-    res.json({
-      msg: "Author Updated Successfully",
-      book: updateBook,
-    });
+    if (!CheckForAuthor) {
+      const updateBook = await BookModel.findOneAndUpdate(
+        {
+          ISBN: isbn,
+        },
+        {
+          $addToSet: {
+            author: newAuthor,
+          },
+        },
+        {
+          new: true,
+        }
+      );
+
+      res.status(200).json({
+        msg: "Author Updated Successfully",
+        book: updateBook,
+      });
+    } else {
+      res.status(200).json({
+        msg: `Author with id ${newAuthor} Already Exists in Book with ISBN ${isbn}`,
+      });
+    }
   } catch (err) {
-    res.json({ err: err.message });
+    res.status(400).json({ err: err.message });
   }
 });
 
@@ -188,13 +217,30 @@ router.put("/update/:isbn/author/", async (req, res) => {
 // Body     - { title: newTtile }
 
 router.put("/update/:isbn", async (req, res) => {
-  const updatedBook = await BookModel.findOneAndUpdate(
-    { ISBN: request.params.isbn },
-    { title: request.body.title },
-    { new: true }
-  );
+  try {
+    const checkBookIsbnExist = await BookModel.findOne({ ISBN: req.body.isbn });
 
-  return response.json(updatedBook);
+    if (!checkBookIsbnExist && req.body.title) {
+      const updatedBook = await BookModel.findOneAndUpdate(
+        { ISBN: req.params.isbn },
+        { title: req.body.title },
+        { new: true }
+      );
+      if (updatedBook) {
+        return res.status(200).json(updatedBook);
+      } else {
+        return res.status(400).json({
+          error: `Updation Failed`,
+        });
+      }
+    } else {
+      return res.status(400).json({
+        error: `No book found for the ISBN ${req.params.isbn}`,
+      });
+    }
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 // Route    - /books/deleteBook/:isbn
 // Des      - to delete a book
@@ -203,16 +249,27 @@ router.put("/update/:isbn", async (req, res) => {
 // Params   - isbn
 // Body     - none
 
-router.delete("/deleteBook/:isbn", async (req, resp) => {
-  const deleteBook = await BookModel.findOneAndDelete({
-    ISBN: request.params.isbn,
-  });
-
-  return response.json({
-    message: `Book with isbn ${req.params.isbn} deleted successfully`,
-  });
+router.delete("/deleteBook/:isbn", async (req, res) => {
+  try {
+    const deleteBook = await BookModel.findOneAndDelete({
+      ISBN: req.params.isbn,
+    });
+    if (deleteBook) {
+      return res.status(200).json({
+        message: `Book with isbn ${req.params.isbn} deleted successfully`,
+      });
+    } else {
+      return res.status(400).json({
+        error: `No book found for the ISBN ${req.params.isbn}`,
+      });
+    }
+  } catch (error) {
+    return res.staus(400).json({
+      error: error.message,
+    });
+  }
 });
-// Route    - /book/deleteAuthor/:BookID/:authorID
+// Route    - /books/deleteAuthor/:BookID/:authorID
 // Des      - delete an author from the book
 // Access   - Public
 // Method   - DELETE
@@ -220,22 +277,32 @@ router.delete("/deleteBook/:isbn", async (req, resp) => {
 // Body     - none
 
 router.delete("/deleteAuthor/:isbn/:author_id", async (req, res) => {
-  const isbn = request.params.isbn;
-  const author_id = parseInt(request.params.author_id);
+  try {
+    const isbn = req.params.isbn;
+    const author_id = parseInt(req.params.author_id);
 
-  const updatedBook = await BookModel.findOneAndUpdate(
-    { ISBN: isbn },
-    { $pull: { authors: author_id } },
-    { new: true }
-  );
-
-  const updatedAuthor = await AuthorModel.findOneAndUpdate(
-    { id: author_id },
-    { $pull: { books: isbn } },
-    { new: true }
-  );
-
-  return response.json({ book: updatedBook, author: updatedAuthor });
+    const updatedBook = await BookModel.findOneAndUpdate(
+      { ISBN: isbn },
+      { $pull: { author: author_id } },
+      { new: true }
+    );
+    console.log(updatedBook);
+    const updatedAuthor = await AuthorModel.findOneAndUpdate(
+      { id: author_id },
+      { $pull: { books: isbn } },
+      { new: true }
+    );
+    console.log(updatedAuthor);
+    if (updatedBook && updatedAuthor) {
+      return res.status(200).json({ book: updatedBook, author: updatedAuthor });
+    } else {
+      return res.status(400).json({ error: "No book found" });
+    }
+  } catch (error) {
+    return res.status(400).json({
+      error: error.message,
+    });
+  }
 });
 
 module.exports = router;

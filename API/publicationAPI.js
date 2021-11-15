@@ -10,11 +10,20 @@ Parameter       None
 Methods         GET
 */
 router.get("/", async (req, res) => {
-  const Publication = await PublicationModel.find();
-
-  res.json({
-    publications: Publication,
-  });
+  try {
+    const Publication = await PublicationModel.find();
+    if (Publication) {
+      res.json({
+        publications: Publication,
+      });
+    } else {
+      res.status(400).json({
+        message: "No Publications Found",
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 //-------------------------------------------------------------------------------------
 /* 
@@ -33,9 +42,9 @@ router.post("/new/", async (req, res) => {
     res.status(200).json({
       msg: "Publication Added Successfully",
     });
-  } catch (err) {
+  } catch (error) {
     res.status(400).json({
-      err,
+      error: error.message,
     });
   }
 });
@@ -56,7 +65,7 @@ router.get("/:pub_id", async (req, res) => {
     });
 
     if (specificPublication) {
-      res.status.json({
+      res.status(200).json({
         publication: specificPublication,
       });
     } else {
@@ -64,9 +73,9 @@ router.get("/:pub_id", async (req, res) => {
         msg: `Publication with id ${pub_id} is not found`,
       });
     }
-  } catch (err) {
-    res.status(200).json({
-      err,
+  } catch (error) {
+    res.status(400).json({
+      error: error.message,
     });
   }
 });
@@ -79,21 +88,27 @@ router.get("/:pub_id", async (req, res) => {
   Methods         GET
   */
 router.get("/book/:isbn", async (req, res) => {
-  const { isbn } = req.params;
+  try {
+    const { isbn } = req.params;
 
-  Publication = await PublicationModel.find({
-    books: isbn,
-  });
-
-  if (Publication) {
-    res.status(200).json({
-      founded_data: Publication.length,
-      publication: Publication,
+    Publication = await PublicationModel.find({
+      books: isbn,
     });
-  } else {
-    res.status(200).json({
-      founded_data: Publication.length,
-      msg: `No Publication Found for the Book with ISBN ${isbn}`,
+
+    if (Publication) {
+      res.status(200).json({
+        founded_data: Publication.length,
+        publication: Publication,
+      });
+    } else {
+      res.status(200).json({
+        founded_data: Publication.length,
+        msg: `No Publication Found for the Book with ISBN ${isbn}`,
+      });
+    }
+  } catch (error) {
+    res.status(400).json({
+      error: error.message,
     });
   }
 });
@@ -107,19 +122,28 @@ router.get("/book/:isbn", async (req, res) => {
 // Body     - { "book": ISBN }
 
 router.put("/updateBook/:pub_id", async (req, resp) => {
-  const updatedPublication = await PublicationModel.findOneAndUpdate(
-    { id: parseInt(request.params.pub_id) },
-    { $addToSet: { books: request.body.book } },
-    { new: true }
-  );
+  try {
+    const updatedPublication = await PublicationModel.findOneAndUpdate(
+      { id: parseInt(req.params.pub_id) },
+      { $addToSet: { books: req.body.book } },
+      { new: true }
+    );
 
-  const updatedBook = await BookModel.findOneAndUpdate(
-    { ISBN: request.body.book },
-    { publication: parseInt(request.params.id) },
-    { new: true }
-  );
-
-  return response.json({ publication: updatedPublication, book: updatedBook });
+    const updatedBook = await BookModel.findOneAndUpdate(
+      { ISBN: req.body.book },
+      { publication: parseInt(req.params.id) },
+      { new: true }
+    );
+    if (updatedPublication && updatedBook) {
+      return res.json({ publication: updatedPublication, book: updatedBook });
+    } else {
+      return res.status(400).json({
+        message: "Book not found",
+      });
+    }
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 // Route    - /publications/delete/:pub_id
@@ -130,11 +154,18 @@ router.put("/updateBook/:pub_id", async (req, resp) => {
 // Body     - none
 
 router.delete("/delete/:pub_id", async (req, res) => {
-  const updatedPublication = await PublicationModel.findOneAndDelete({
-    id: parseInt(request.params.pub_id),
-  });
-
-  return response.json({ publications: updatedPublication });
+  try {
+    const updatedPublication = await PublicationModel.findOneAndDelete({
+      id: parseInt(request.params.pub_id),
+    });
+    if (updatedPublication) {
+      res.status(200).json({
+        msg: "Publication Deleted Successfully",
+      });
+    }
+  } catch (error) {
+    return response.status(400).json({ error: error.message });
+  }
 });
 // Route    - /publications/deleteBook/:pub_id/:isbn
 // Des      - delete a book from publication
@@ -144,22 +175,34 @@ router.delete("/delete/:pub_id", async (req, res) => {
 // Body     - none
 
 router.delete("/deleteBook/:pub_id/:book_id", async (req, res) => {
-  const pub_id = parseInt(request.params.pub_id);
-  const isbn = request.params.book_id;
+  try {
+    const pub_id = parseInt(request.params.pub_id);
+    const isbn = request.params.book_id;
 
-  const updatedPublication = await PublicationModel.findOneAndUpdate(
-    { id: pub_id },
-    { $pull: { books: isbn } },
-    { new: true }
-  );
+    const updatedPublication = await PublicationModel.findOneAndUpdate(
+      { id: pub_id },
+      { $pull: { books: isbn } },
+      { new: true }
+    );
 
-  const updatedBook = await BookModel.findOneAndUpdate(
-    { ISBN: isbn },
-    { publication: -1 },
-    { new: true }
-  );
+    const updatedBook = await BookModel.findOneAndUpdate(
+      { ISBN: isbn },
+      { publication: -1 },
+      { new: true }
+    );
 
-  res.status(200).json({ publication: updatedPublication, book: updatedBook });
+    if (updatedPublication && updatedBook) {
+      res
+        .status(200)
+        .json({ publication: updatedPublication, book: updatedBook });
+    } else {
+      res.status(400).json({
+        message: "Deletion Failed",
+      });
+    }
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 module.exports = router;
